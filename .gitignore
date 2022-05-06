@@ -1,6 +1,9 @@
-#npm
+# npm
 /node_modules
 npm-debug.log*
+
+# tests
+/coverage
 
 # misc
 .DS_Store
