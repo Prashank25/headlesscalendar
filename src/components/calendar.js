@@ -1,5 +1,5 @@
 import {
-  computed,
+  computed, getCurrentInstance,
   inject,
   nextTick,
   onUnmounted,
@@ -13,6 +13,7 @@ import { adjustDays, endOfWeek, startOfWeek } from '../internals/dates'
 import { omit, chunk, isEqual } from '../internals/utils'
 import { useId } from '../internals/useId'
 import { monthMatrix } from '../matrices/monthMatrix'
+import { useOptionalModel } from '../internals/useOptionalModel'
 
 export const calendarContext = Symbol('CalendarContext')
 
@@ -66,7 +67,7 @@ export const Calendar = {
 
   setup (props, { attrs, slots, emit }) {
     const value = computed(() => props.modelValue)
-    const cursor = computed(() => props.cursor)
+    const cursor = useOptionalModel('cursor')
     const matrix = computed(() => props.matrix)
     const weekStartsFrom = computed(() => props.weekStartsFrom)
     const dateRefs = ref(new Map())
@@ -96,7 +97,7 @@ export const Calendar = {
         emit('update:modelValue', selected)
       },
       setCursor (date) {
-        emit('update:cursor', date)
+        cursor.value = date
       },
     })
 

@@ -9,16 +9,15 @@ import {
   CalendarNextButton,
   CalendarPreviousButton,
 } from './calendar'
-import { shallowMount } from '@vue/test-utils'
 import { fireEvent } from '@testing-library/vue'
-import { renderComponent } from '../test-utils/renderComponent'
-import { suppressConsoleLogs } from '../test-utils/surpressConsoleLog'
 import { formatHtml } from '../test-utils/formatHtml'
-import { nextTick, ref } from 'vue'
-import { weekMatrix } from '../matrices/weekMatrix'
 import { monthMatrix } from '../matrices/monthMatrix'
-
-const log = console.log
+import { nextTick, ref } from 'vue'
+import { renderComponent } from '../test-utils/renderComponent'
+import { shallowMount } from '@vue/test-utils'
+import { suppressConsoleLogs } from '../test-utils/surpressConsoleLog'
+import { tap } from '../internals/utils'
+import { weekMatrix } from '../matrices/weekMatrix'
 
 function render (input) {
   let defaultComponents = {
@@ -158,13 +157,102 @@ describe('Calendar', () => {
     expect(container.textContent).toBe(JSON.stringify(matrix.dates()))
   })
 
-  it('Calendar sets the cursor to current date if it is not set as a prop',
+  it(
+    'Calendar sets the cursor to current date if it is not set as a prop',
     () => {
       const { html } = render(
         `<Calendar v-slot="{ cursor }">{{ cursor.toString() }}</Calendar>`,
       )
 
       expect(html()).toEqual(`<div>${new Date().toString()}</div>`)
+    },
+  )
+
+  it(
+    'Calendar emits update:cursor event when cursor is changed but without a v-model binding',
+    async () => {
+      const cursorUpdated = jest.fn()
+      const { getByTestId } = render({
+        template: `
+          <Calendar :matrix="weekMatrix" @update:cursor="cursorUpdated">
+          <CalendarNextButton data-testid="nextButton"/>
+          </Calendar>
+        `,
+        setup: () => ({ weekMatrix, cursorUpdated }),
+      })
+
+      await fireEvent.click(getByTestId('nextButton'))
+
+      const expectedCursor = tap(new Date(), (d) => d.setDate(d.getDate() + 7))
+      expect(cursorUpdated).toHaveBeenCalledTimes(1)
+      expect(cursorUpdated.mock.lastCall[0].toDateString())
+        .toBe(expectedCursor.toDateString())
+    },
+  )
+
+  it(
+    'Calendar updated the internal cursor when cursor is changed but without a v-model binding',
+    async () => {
+      const { getByTestId } = render({
+        template: `
+          <Calendar :matrix="weekMatrix" v-slot="{ cursor }">
+          <span data-testid="cursorDate">{{ cursor.toDateString() }}</span>
+          <CalendarNextButton data-testid="nextButton"/>
+          </Calendar>
+        `,
+        setup: () => ({ weekMatrix }),
+      })
+
+      await fireEvent.click(getByTestId('nextButton'))
+
+      const expectedCursor = tap(new Date(), (d) => d.setDate(d.getDate() + 7))
+      expect(getByTestId('cursorDate'))
+        .toHaveTextContent(expectedCursor.toDateString())
+    },
+  )
+
+  it('Calendar syncs from v-model:cursor when one is set', async () => {
+    const testCursor = ref(new Date(2022, 2, 2))
+    const newCursor = new Date(2022, 1, 1)
+    const { container } = render({
+      template: `
+        <Calendar
+          :matrix="weekMatrix"
+          v-model:cursor="testCursor"
+          v-slot="{ cursor }"
+        >
+        {{ cursor.toDateString() }}
+        </Calendar>
+      `,
+      setup: () => ({ weekMatrix, testCursor }),
+    })
+
+    testCursor.value = newCursor
+
+    await nextTick()
+    expect(container).toHaveTextContent(
+      new Date(2022, 1, 1).toDateString(),
+    )
+  })
+
+  it(
+    'Calendar emits update:cursor event when cursor is changed with v-model:cursor is set',
+    async () => {
+      const testCursor = ref(new Date())
+      const { getByTestId } = render({
+        template: `
+          <Calendar :matrix="weekMatrix" v-model:cursor="testCursor">
+          <CalendarNextButton data-testid="nextButton"/>
+          </Calendar>
+        `,
+        setup: () => ({ weekMatrix, testCursor }),
+      })
+
+      await fireEvent.click(getByTestId('nextButton'))
+
+      const expectedCursor = tap(new Date(), (d) => d.setDate(d.getDate() + 7))
+      expect(testCursor.value.toDateString())
+        .toBe(expectedCursor.toDateString())
     },
   )
 })
@@ -465,10 +553,12 @@ describe('CalendarPreviousButton', () => {
 
     await nextTick()
 
-    const expectedCursor = new Date()
-    expectedCursor.setMonth(expectedCursor.getMonth() - 1)
-    // expect(testCursor.value.toString()).toBe(expectedCursor.toString())
-    // expect(getByTestId('date').textContent).toBe(expectedCursor.toDateString())
+    const expectedCursor = tap(new Date(), (date) => {
+      date.setDate(1)
+      date.setMonth(date.getMonth() - 1)
+    })
+    expect(testCursor.value.toString()).toBe(expectedCursor.toString())
+    expect(getByTestId('date').textContent).toBe(expectedCursor.toDateString())
   })
 
   it('moves the cursor to previous unit of time when matrix is set',
