@@ -1,5 +1,5 @@
 import {
-  computed, getCurrentInstance,
+  computed,
   inject,
   nextTick,
   onUnmounted,

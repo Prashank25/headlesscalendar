@@ -1,9 +1,11 @@
 # npm
-/node_modules
-npm-debug.log*
+/package/node_modules
+/playground/node_modules
+/package/npm-debug.log*
+/playground/npm-debug.log*
 
 # tests
-/coverage
+/package/coverage
 
 # misc
 .DS_Store
